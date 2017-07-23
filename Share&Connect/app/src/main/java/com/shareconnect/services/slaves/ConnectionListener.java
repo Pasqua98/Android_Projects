@@ -9,13 +9,16 @@ import android.text.format.Formatter;
 import com.shareconnect.constants.Constants;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import static android.content.Context.WIFI_SERVICE;
+import static com.shareconnect.constants.Constants.ACTION_SEND_BROADCAST;
+import static com.shareconnect.constants.Constants.PORT;
 
 /**
  * Created by pasqua98 on 7/20/17.
@@ -29,10 +32,10 @@ public class ConnectionListener extends AsyncTask implements Talker {
 
     public ConnectionListener(Service boundService) {
         super();
-        BUFFER = new byte[32];
         bindService(boundService);
+        BUFFER = new byte[64];
         try {
-            socket = new MulticastSocket(Constants.PORT);
+            socket = new MulticastSocket(PORT);
             InetAddress ip = InetAddress.getByName(Constants.BROADCAST_IP);
             socket.joinGroup(ip);
         } catch (IOException e) {
@@ -44,20 +47,25 @@ public class ConnectionListener extends AsyncTask implements Talker {
     @Override
     protected Object doInBackground(Object[] objects) {
 
-        final byte[] ACTION_ID = BigInteger.valueOf(Constants.ACTION_SEND_BROADCAST).toByteArray();
-        final byte[] UID = BigInteger.valueOf(createUid()).toByteArray();
+        final byte[] ACTION_ID = toByteArray(ACTION_SEND_BROADCAST);
+        final byte[] UID = toByteArray(createUid());
         final byte[] DEVICE_NAME = Build.MODEL.getBytes();
-        final byte[] CURRENT_IP = getCurrentIP().getBytes();
 
+        System.out.println(Arrays.toString(ACTION_ID));
         ByteBuffer byteBuffer = ByteBuffer.wrap(BUFFER);
         byteBuffer.put(ACTION_ID);
         byteBuffer.put(UID);
         byteBuffer.put(DEVICE_NAME);
-        byteBuffer.put(CURRENT_IP);
 
 
         BUFFER = byteBuffer.array();
-        DatagramPacket infoPacket = new DatagramPacket(BUFFER, BUFFER.length);
+        DatagramPacket infoPacket = null;
+        try {
+            infoPacket = new DatagramPacket(BUFFER, BUFFER.length, InetAddress.getByName(Constants.BROADCAST_IP), PORT);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+        System.out.println(Arrays.toString(BUFFER));
 
         try {
             socket.send(infoPacket);
@@ -96,6 +104,10 @@ public class ConnectionListener extends AsyncTask implements Talker {
     private int createUid() {
         Integer i = new Integer((int) System.currentTimeMillis());
         return i.hashCode();
+    }
+
+    private byte[] toByteArray(int i) {
+        return ByteBuffer.allocate(4).putInt(i).array();
     }
 
 }
